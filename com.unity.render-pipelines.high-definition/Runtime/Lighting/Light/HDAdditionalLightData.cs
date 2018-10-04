@@ -216,15 +216,13 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 return -1;
 
             // Create shadow requests array using the light type
-            if (shadowRequests == null || shadowRequests.Length != GetShadowRequestCount(shadowSettings))
+            if (shadowRequests == null)
             {
-                int count      = GetShadowRequestCount(shadowSettings);
-                shadowRequests = new HDShadowRequest[count];
+                const int maxLightShadowRequestsCount = 6;
+                shadowRequests = new HDShadowRequest[maxLightShadowRequestsCount];
 
-                for (int i = 0; i < count; i++)
-                {
+                for (int i = 0; i < maxLightShadowRequestsCount; i++)
                     shadowRequests[i] = new HDShadowRequest();
-                }
             }
 
             // If the shadow is too far away, we don't render it
@@ -248,7 +246,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             viewportSize = Vector2.Max(viewportSize, new Vector2(16, 16));
 
-            for (int requestIndex = 0; requestIndex < shadowRequests.Length; requestIndex++)
+            int count = GetShadowRequestCount(shadowSettings);
+            for (int requestIndex = 0; requestIndex < count; requestIndex++)
             {
                 var         shadowRequest = shadowRequests[requestIndex];
                 Matrix4x4   invViewProjection = Matrix4x4.identity;
