@@ -6,18 +6,19 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 {
     public class HDShadowAtlas
     {
-        public readonly RenderTargetIdentifier  identifier;
-        public readonly List<HDShadowRequest>   shadowRequests = new List<HDShadowRequest>();
+        public readonly RenderTargetIdentifier      identifier;
+        readonly List<HDShadowResolutionRequest>    m_ShadowResolutionRequests = new List<HDShadowResolutionRequest>();
+        readonly List<HDShadowRequest>              m_ShadowRequests = new List<HDShadowRequest>();
 
-        int                             m_Width;
-        int                             m_Height;
+        int                         m_Width;
+        int                         m_Height;
 
-        RTHandleSystem.RTHandle         m_Atlas;
-        Material                        m_ClearMaterial;
-        LightingDebugSettings           m_LightingDebugSettings;
-        float                           m_RcpScaleFactor = 1;
+        RTHandleSystem.RTHandle     m_Atlas;
+        Material                    m_ClearMaterial;
+        LightingDebugSettings       m_LightingDebugSettings;
+        float                       m_RcpScaleFactor = 1;
 
-        public HDShadowAtlas(int width, int height, Material clearMaterial, FilterMode filterMode = FilterMode.Bilinear, DepthBits depthBufferBits = DepthBits.Depth16, RenderTextureFormat format = RenderTextureFormat.Shadowmap, string name = "")
+        public HDShadowAtlas(int width, int height, int maxShadowRequests, Material clearMaterial, FilterMode filterMode = FilterMode.Bilinear, DepthBits depthBufferBits = DepthBits.Depth16, RenderTextureFormat format = RenderTextureFormat.Shadowmap, string name = "")
         {
             m_Atlas = RTHandles.Alloc(width, height, filterMode: filterMode, depthBufferBits: depthBufferBits, sRGB: false, colorFormat: format, name: name);
             m_Width = width;
@@ -26,9 +27,14 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             m_ClearMaterial = clearMaterial;
         }
 
-        public void Reserve(HDShadowRequest shadowRequest)
+        public void ReserveResolution(HDShadowResolutionRequest shadowRequest)
         {
-            shadowRequests.Add(shadowRequest);
+            m_ShadowResolutionRequests.Add(shadowRequest);
+        }
+        
+        public void AddShadowRequest(HDShadowRequest shadowRequest)
+        {
+            m_ShadowRequests.Add(shadowRequest);
         }
 
         public void UpdateDebugSettings(LightingDebugSettings lightingDebugSettings)
@@ -38,7 +44,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         // Stable (unlike List.Sort) sorting algorithm which, unlike Linq's, doesn't use JIT (lol).
         // Sorts in place. Very efficient (O(n)) for already sorted data.
-        void InsertionSort(List<HDShadowRequest> array)
+        void InsertionSort(List<HDShadowResolutionRequest> array)
         {
             int i = 1;
             int n = array.Count;
@@ -64,19 +70,17 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         public bool Layout(bool allowResize = true)
         {
-            // TODO: change this sort (and maybe the list) by something that don't create garbage
-            // Note: it is very important to keep the added order for shadow maps that are the same size (for punctual lights)
-            // and because of that we can't use List.Sort because it messes up the list even with a good custom comparator
-
             // Perform a deep copy.
-            int n = (shadowRequests != null) ? shadowRequests.Count : 0;
-            var sortedRequests = new List<HDShadowRequest>(n);
+            int n = (m_ShadowResolutionRequests != null) ? m_ShadowResolutionRequests.Count : 0;
+            var sortedRequests = new List<HDShadowResolutionRequest>(n);
 
             for (int i = 0; i < n; i++)
             {
-                sortedRequests.Add(shadowRequests[i]);
+                sortedRequests.Add(m_ShadowResolutionRequests[i]);
             }
 
+            // Note: it is very important to keep the added order for shadow maps that are the same size (for punctual lights)
+            // and because of that we can't use List.Sort because it messes up the list even with a good custom comparator
             // Sort in place.
             InsertionSort(sortedRequests);
 
@@ -87,7 +91,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             foreach (var shadowRequest in sortedRequests)
             {
                 // shadow atlas layouting
-                Rect viewport = new Rect(Vector2.zero, shadowRequest.viewportSize);
+                Rect viewport = new Rect(Vector2.zero, shadowRequest.resolution);
                 curH = Mathf.Max(curH, viewport.height);
 
                 if (curX + viewport.width > xMax)
@@ -109,6 +113,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 viewport.x = curX;
                 viewport.y = curY;
                 shadowRequest.atlasViewport = viewport;
+                shadowRequest.resolution = viewport.size;
                 curX += viewport.width;
             }
 
@@ -124,53 +129,54 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             float currentMaxX = 0;
 
             // Place shadows in a square shape
-            while (index < shadowRequests.Count)
+            while (index < m_ShadowResolutionRequests.Count)
             {
                 float y = 0;
                 float currentMaxXCache = currentMaxX;
                 do
                 {
-                    Rect r = new Rect(Vector2.zero, shadowRequests[index].viewportSize);
+                    Rect r = new Rect(Vector2.zero, m_ShadowResolutionRequests[index].resolution);
                     r.x = currentMaxX;
                     r.y = y;
                     y += r.height;
                     currentY = Mathf.Max(currentY, y);
                     currentMaxXCache = Mathf.Max(currentMaxXCache, currentMaxX + r.width);
-                    shadowRequests[index].atlasViewport = r;
+                    m_ShadowResolutionRequests[index].atlasViewport = r;
                     index++;
-                } while (y < currentMaxY && index < shadowRequests.Count);
+                } while (y < currentMaxY && index < m_ShadowResolutionRequests.Count);
                 currentMaxY = Mathf.Max(currentMaxY, currentY);
                 currentMaxX = currentMaxXCache;
-                if (index >= shadowRequests.Count)
+                if (index >= m_ShadowResolutionRequests.Count)
                     continue;
                 float x = 0;
                 float currentMaxYCache = currentMaxY;
                 do
                 {
-                    Rect r = new Rect(Vector2.zero, shadowRequests[index].viewportSize);
+                    Rect r = new Rect(Vector2.zero, m_ShadowResolutionRequests[index].resolution);
                     r.x = x;
                     r.y = currentMaxY;
                     x += r.width;
                     currentX = Mathf.Max(currentX, x);
                     currentMaxYCache = Mathf.Max(currentMaxYCache, currentMaxY + r.height);
-                    shadowRequests[index].atlasViewport = r;
+                    m_ShadowResolutionRequests[index].atlasViewport = r;
                     index++;
-                } while (x < currentMaxX && index < shadowRequests.Count);
+                } while (x < currentMaxX && index < m_ShadowResolutionRequests.Count);
                 currentMaxX = Mathf.Max(currentMaxX, currentX);
                 currentMaxY = currentMaxYCache;
             }
 
-            Vector4 scale = new Vector4(m_Width / currentMaxX, m_Height / currentMaxY, m_Width / currentMaxX, m_Height / currentMaxY);
-            m_RcpScaleFactor = Mathf.Max(scale.x, scale.y);
+            float maxResolution = Math.Max(currentMaxX, currentMaxY);
+            Vector4 scale = new Vector4(m_Width / maxResolution, m_Height / maxResolution, m_Width / maxResolution, m_Height / maxResolution);
+            m_RcpScaleFactor = Mathf.Min(scale.x, scale.y);
 
             // Scale down every shadow rects to fit with the current atlas size
-            foreach (var r in shadowRequests)
+            foreach (var r in m_ShadowResolutionRequests)
             {
-                r.viewBias.w /= Mathf.Max(scale.x, scale.y); // TODO m_LightingDebugSettings
                 Vector4 s = new Vector4(r.atlasViewport.x, r.atlasViewport.y, r.atlasViewport.width, r.atlasViewport.height);
                 Vector4 reScaled = Vector4.Scale(s, scale);
 
                 r.atlasViewport = new Rect(reScaled.x, reScaled.y, reScaled.z, reScaled.w);
+                r.resolution = r.atlasViewport.size;
             }
         }
 
@@ -182,7 +188,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             if (m_LightingDebugSettings.clearShadowAtlas)
                 CoreUtils.DrawFullScreen(cmd, m_ClearMaterial, null, 0);
 
-            foreach (var shadowRequest in shadowRequests)
+            foreach (var shadowRequest in m_ShadowRequests)
             {
                 cmd.SetViewport(shadowRequest.atlasViewport);
                 cmd.SetViewProjectionMatrices(shadowRequest.view, shadowRequest.projection);
@@ -221,7 +227,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         public void Clear()
         {
-            shadowRequests.Clear();
+            m_ShadowResolutionRequests.Clear();
+            m_ShadowRequests.Clear();
         }
 
         public void Release()
