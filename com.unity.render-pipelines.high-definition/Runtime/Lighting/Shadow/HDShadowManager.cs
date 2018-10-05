@@ -142,6 +142,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         int                         m_ShadowRequestCount;
         Material                    m_ClearMaterial;
         DepthBits                   m_DepthBits;
+        int                         m_CascadeCount;
 
         public HDShadowManager(int width, int height, int maxShadowRequests, DepthBits atlasDepthBits, Shader clearShader)
         {
@@ -225,6 +226,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             {
                 cullingSphere.w *= cullingSphere.w;
             }
+
+            m_CascadeCount = Mathf.Max(m_CascadeCount, cascadeIndex);
 
             unsafe
             {
@@ -368,6 +371,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             cmd.SetGlobalTexture(HDShaderIDs._ShadowmapAtlas, m_Atlas.identifier);
             cmd.SetGlobalTexture(HDShaderIDs._ShadowmapCascadeAtlas, m_CascadeAtlas.identifier);
+
+            cmd.SetGlobalInt(HDShaderIDs._CascadeShadowCount, m_CascadeCount + 1);
         }
 
         public int GetShadowRequestCount()
@@ -382,8 +387,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             m_CascadeAtlas.Clear();
             m_ShadowResolutionRequests.Clear();
 
-
             m_ShadowRequestCount = 0;
+            m_CascadeCount = 0;
         }
 
         // Warning: must be called after ProcessShadowRequests and RenderShadows to have valid informations

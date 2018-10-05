@@ -268,8 +268,6 @@ real EvalShadow_PunctualDepth(HDShadowData sd, Texture2D tex, SamplerComparisonS
 //  Directional shadows (cascaded shadow map)
 //
 
-#define kMaxShadowCascades 4
-
 int EvalShadow_GetSplitIndex(HDShadowContext shadowContext, int index, real3 positionWS, out real alpha, out int cascadeCount)
 {
     int   i = 0;
@@ -280,7 +278,7 @@ int EvalShadow_GetSplitIndex(HDShadowContext shadowContext, int index, real3 pos
     HDDirectionalShadowData dsd = shadowContext.directionalShadowData;
 
     // find the current cascade
-    for (; i < kMaxShadowCascades; i++)
+    for (; i < _CascadeShadowCount; i++)
     {
         real4  sphere  = dsd.sphereCascades[i];
                 wposDir = -sphere.xyz + positionWS;
@@ -293,7 +291,7 @@ int EvalShadow_GetSplitIndex(HDShadowContext shadowContext, int index, real3 pos
             break;
         }
     }
-    int shadowSplitIndex = i < kMaxShadowCascades ? i : -1;
+    int shadowSplitIndex = i < _CascadeShadowCount ? i : -1;
 
     real3 cascadeDir = dsd.cascadeDirection.xyz;
     cascadeCount     = dsd.cascadeDirection.w;
