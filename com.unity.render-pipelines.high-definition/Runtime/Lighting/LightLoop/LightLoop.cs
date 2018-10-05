@@ -358,7 +358,13 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         void InitShadowSystem(HDRenderPipelineAsset hdAsset)
         {
             m_ShadowInitParameters = hdAsset.GetRenderPipelineSettings().hdShadowInitParams;
-            m_ShadowManager = new HDShadowManager(m_ShadowInitParameters.shadowAtlasWidth, m_ShadowInitParameters.shadowAtlasHeight, m_ShadowInitParameters.maxShadowRequests, m_ShadowInitParameters.shadowMapsDepthBits, hdAsset.renderPipelineResources.shaders.shadowClearPS);
+            m_ShadowManager = new HDShadowManager(
+                m_ShadowInitParameters.shadowAtlasResolution,
+                m_ShadowInitParameters.shadowAtlasResolution,
+                m_ShadowInitParameters.maxShadowRequests,
+                m_ShadowInitParameters.shadowMapsDepthBits,
+                hdAsset.renderPipelineResources.shaders.shadowClearPS
+            );
         }
 
         void DeinitShadowSystem()

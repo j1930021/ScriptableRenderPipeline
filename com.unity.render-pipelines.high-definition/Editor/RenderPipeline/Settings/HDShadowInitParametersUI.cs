@@ -9,6 +9,18 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
 
     class HDShadowInitParametersUI : BaseUI<SerializedHDShadowInitParameters>
     {
+        enum ShadowResolution
+        {
+            ShadowResolution128 = 128,
+            ShadowResolution256 = 256,
+            ShadowResolution512 = 512,
+            ShadowResolution1024 = 1024,
+            ShadowResolution2048 = 2048,
+            ShadowResolution4096 = 4096,
+            ShadowResolution8192 = 8192,
+            ShadowResolution16384 = 16384
+        }
+
         public static readonly CED.IDrawer SectionAtlas = CED.Action(Drawer_FieldHDShadows);
 
         public HDShadowInitParametersUI()
@@ -23,8 +35,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             ++EditorGUI.indentLevel;
             EditorGUILayout.LabelField(_.GetContent("Atlas"), EditorStyles.boldLabel);
             ++EditorGUI.indentLevel;
-            EditorGUILayout.PropertyField(d.shadowAtlasWidth, _.GetContent("Width"));
-            EditorGUILayout.PropertyField(d.shadowAtlasHeight, _.GetContent("Height"));
+            d.shadowAtlasResolution.intValue = (int)(ShadowResolution)EditorGUILayout.EnumPopup(_.GetContent("Resolution"), (ShadowResolution)d.shadowAtlasResolution.intValue);
             bool shadowMap16Bits = (DepthBits)d.shadowMapDepthBits.intValue	== DepthBits.Depth16;
             shadowMap16Bits = EditorGUILayout.Toggle(_.GetContent("16-bit Shadow Maps"), shadowMap16Bits);
             d.shadowMapDepthBits.intValue = (shadowMap16Bits) ? (int)DepthBits.Depth16 : (int)DepthBits.Depth32;
@@ -45,10 +56,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             EditorGUILayout.PropertyField(d.punctualShadowQuality, _.GetContent("Punctual Shadow Quality"));
             EditorGUILayout.PropertyField(d.directionalShadowQuality, _.GetContent("Directional Shadow Quality"));
             --EditorGUI.indentLevel;
-
-            // Clamp negative values
-            d.shadowAtlasHeight.intValue = Mathf.Max(0, d.shadowAtlasHeight.intValue);
-            d.shadowAtlasWidth.intValue = Mathf.Max(0, d.shadowAtlasWidth.intValue);
 
             --EditorGUI.indentLevel;
         }
