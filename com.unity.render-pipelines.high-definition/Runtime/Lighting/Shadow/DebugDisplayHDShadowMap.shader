@@ -34,7 +34,7 @@ Shader "Hidden/ScriptableRenderPipeline/DebugDisplayHDShadowMap"
             {
                 output.texcoord.y = 1.0f - output.texcoord.y;
             }
-            output.texcoord = output.texcoord *_TextureScaleBias.xy + _TextureScaleBias.zw;
+            output.texcoord = output.texcoord * _TextureScaleBias.xy + _TextureScaleBias.zw;
             return output;
         }
     ENDHLSL

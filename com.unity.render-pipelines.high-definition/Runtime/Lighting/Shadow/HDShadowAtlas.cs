@@ -6,25 +6,54 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 {
     public class HDShadowAtlas
     {
-        public readonly RenderTargetIdentifier      identifier;
+        public RenderTargetIdentifier               identifier { get; private set; }
         readonly List<HDShadowResolutionRequest>    m_ShadowResolutionRequests = new List<HDShadowResolutionRequest>();
         readonly List<HDShadowRequest>              m_ShadowRequests = new List<HDShadowRequest>();
 
-        int                         m_Width;
-        int                         m_Height;
+        public int                  width { get; private set; }
+        public int                  height  { get; private set; }
 
         RTHandleSystem.RTHandle     m_Atlas;
         Material                    m_ClearMaterial;
         LightingDebugSettings       m_LightingDebugSettings;
         float                       m_RcpScaleFactor = 1;
+        FilterMode                  m_FilterMode;
+        DepthBits                   m_DepthBufferBits;
+        RenderTextureFormat         m_Format;
+        string                      m_Name;
+        int                         m_AtlasSizeShaderID;
 
-        public HDShadowAtlas(int width, int height, int maxShadowRequests, Material clearMaterial, FilterMode filterMode = FilterMode.Bilinear, DepthBits depthBufferBits = DepthBits.Depth16, RenderTextureFormat format = RenderTextureFormat.Shadowmap, string name = "")
+        public HDShadowAtlas(int width, int height, int atlasSizeShaderID, Material clearMaterial, FilterMode filterMode = FilterMode.Bilinear, DepthBits depthBufferBits = DepthBits.Depth16, RenderTextureFormat format = RenderTextureFormat.Shadowmap, string name = "")
         {
-            m_Atlas = RTHandles.Alloc(width, height, filterMode: filterMode, depthBufferBits: depthBufferBits, sRGB: false, colorFormat: format, name: name);
-            m_Width = width;
-            m_Height = height;
-            identifier = new RenderTargetIdentifier(m_Atlas);
+            this.width = width;
+            this.height = height;
+            m_FilterMode = filterMode;
+            m_DepthBufferBits = depthBufferBits;
+            m_Format = format;
+            m_Name = name;
+            m_AtlasSizeShaderID = atlasSizeShaderID;
             m_ClearMaterial = clearMaterial;
+
+            AllocateRenderTexture();
+        }
+
+        void AllocateRenderTexture()
+        {
+            if (m_Atlas != null)
+                m_Atlas.Release();
+            
+            m_Atlas = RTHandles.Alloc(width, height, filterMode: m_FilterMode, depthBufferBits: m_DepthBufferBits, sRGB: false, colorFormat: m_Format, name: m_Name);
+            identifier = new RenderTargetIdentifier(m_Atlas);
+        }
+
+        public void UpdateSize(Vector2Int size)
+        {
+            if (m_Atlas == null || m_Atlas.referenceSize != size)
+            {
+                width = size.x;
+                height = size.y;
+                AllocateRenderTexture();
+            }
         }
 
         public void ReserveResolution(HDShadowResolutionRequest shadowRequest)
@@ -84,7 +113,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             // Sort in place.
             InsertionSort(sortedRequests);
 
-            float curX = 0, curY = 0, curH = 0, xMax = m_Width, yMax = m_Height;
+            float curX = 0, curY = 0, curH = 0, xMax = width, yMax = height;
             m_RcpScaleFactor = 1;
 
             // Assign to every view shadow viewport request a position in the atlas
@@ -166,7 +195,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             }
 
             float maxResolution = Math.Max(currentMaxX, currentMaxY);
-            Vector4 scale = new Vector4(m_Width / maxResolution, m_Height / maxResolution, m_Width / maxResolution, m_Height / maxResolution);
+            Vector4 scale = new Vector4(width / maxResolution, height / maxResolution, width / maxResolution, height / maxResolution);
             m_RcpScaleFactor = Mathf.Min(scale.x, scale.y);
 
             // Scale down every shadow rects to fit with the current atlas size
@@ -183,7 +212,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         public void RenderShadows(ScriptableRenderContext renderContext, CommandBuffer cmd, DrawShadowsSettings dss)
         {
             cmd.SetRenderTarget(identifier);
-            cmd.SetGlobalVector(HDShaderIDs._ShadowAtlasSize, new Vector4(m_Width, m_Height, 1.0f / m_Width, 1.0f / m_Height));
+            cmd.SetGlobalVector(m_AtlasSizeShaderID, new Vector4(width, height, 1.0f / width, 1.0f / height));
             
             if (m_LightingDebugSettings.clearShadowAtlas)
                 CoreUtils.DrawFullScreen(cmd, m_ClearMaterial, null, 0);
@@ -208,12 +237,15 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             cmd.SetGlobalFloat(HDShaderIDs._ZClip, 1.0f);   // Re-enable zclip globally
         }
-
+        
         public void DisplayAtlas(CommandBuffer cmd, Material debugMaterial, Rect atlasViewport, float screenX, float screenY, float screenSizeX, float screenSizeY, float minValue, float maxValue, bool flipY)
         {
+            if (m_Atlas == null)
+                return;
+            
             Vector4 validRange = new Vector4(minValue, 1.0f / (maxValue - minValue));
-            float rWidth = 1.0f / m_Width;
-            float rHeight = 1.0f / m_Height;
+            float rWidth = 1.0f / width;
+            float rHeight = 1.0f / height;
             Vector4 scaleBias = Vector4.Scale(new Vector4(rWidth, rHeight, rWidth, rHeight), new Vector4(atlasViewport.width, atlasViewport.height, atlasViewport.x, atlasViewport.y));
 
             MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
@@ -233,7 +265,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         public void Release()
         {
-            RTHandles.Release(m_Atlas);
+            if (m_Atlas != null)
+                RTHandles.Release(m_Atlas);
         }
     }
 }

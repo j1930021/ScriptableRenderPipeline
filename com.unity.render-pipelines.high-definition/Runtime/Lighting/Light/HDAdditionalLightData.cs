@@ -189,7 +189,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         bool                m_WillRenderShadows;
         int[]               m_ShadowRequestIndices;
 
-        HDShadowSettings    _ShadowSettings;
+        [System.NonSerialized] HDShadowSettings    _ShadowSettings = null;
         HDShadowSettings    m_ShadowSettings
         {
             get
@@ -257,6 +257,10 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             viewportSize = Vector2.Max(viewportSize, new Vector2(16, 16));
 
+            // Update the directional shadow atlas size
+            if (m_Light.type == LightType.Directional)
+                shadowManager.UpdateDirectionalShadowResolution((int)viewportSize.x, m_ShadowSettings.cascadeShadowSplitCount);
+
             // Reserver wanted resolution in the shadow atlas
             bool allowResize = m_Light.type != LightType.Directional;
             int count = GetShadowRequestCount();
@@ -295,16 +299,31 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 switch (m_Light.type)
                 {
                     case LightType.Point:
-                        HDShadowUtils.ExtractPointLightData(m_Light.type, visibleLight, viewportSize, shadowNearPlane, m_ShadowData.normalBiasMax, (uint)index, out shadowRequest.view, out invViewProjection, out shadowRequest.projection, out shadowRequest.deviceProjection, out shadowRequest.splitData);
+                        HDShadowUtils.ExtractPointLightData(
+                            m_Light.type, visibleLight, viewportSize, shadowNearPlane,
+                            m_ShadowData.normalBiasMax, (uint)index, out shadowRequest.view,
+                            out invViewProjection, out shadowRequest.projection,
+                            out shadowRequest.deviceProjection, out shadowRequest.splitData
+                        );
                         break;
                     case LightType.Spot:
-                        HDShadowUtils.ExtractSpotLightData(m_Light.type, spotLightShape, shadowNearPlane, aspectRatio, shapeWidth, shapeHeight, visibleLight, viewportSize, m_ShadowData.normalBiasMax, out shadowRequest.view, out invViewProjection, out shadowRequest.projection, out shadowRequest.deviceProjection, out shadowRequest.splitData);
+                        HDShadowUtils.ExtractSpotLightData(
+                            m_Light.type, spotLightShape, shadowNearPlane, aspectRatio, shapeWidth,
+                            shapeHeight, visibleLight, viewportSize, m_ShadowData.normalBiasMax,
+                            out shadowRequest.view, out invViewProjection, out shadowRequest.projection,
+                            out shadowRequest.deviceProjection, out shadowRequest.splitData
+                        );
                         break;
                     case LightType.Directional:
                         Vector4 cullingSphere;
                         float   nearPlaneOffset = QualitySettings.shadowNearPlaneOffset;
 
-                        HDShadowUtils.ExtractDirectionalLightData(visibleLight, viewportSize, (uint)index, m_ShadowSettings.cascadeShadowSplitCount, m_ShadowSettings.cascadeShadowSplits, nearPlaneOffset, cullResults, lightIndex, out shadowRequest.view, out invViewProjection, out shadowRequest.projection, out shadowRequest.deviceProjection, out shadowRequest.splitData);
+                        HDShadowUtils.ExtractDirectionalLightData(
+                            visibleLight, viewportSize, (uint)index, m_ShadowSettings.cascadeShadowSplitCount,
+                            m_ShadowSettings.cascadeShadowSplits, nearPlaneOffset, cullResults, lightIndex,
+                            out shadowRequest.view, out invViewProjection, out shadowRequest.projection,
+                            out shadowRequest.deviceProjection, out shadowRequest.splitData
+                        );
 
                         cullingSphere = shadowRequest.splitData.cullingSphere;
 

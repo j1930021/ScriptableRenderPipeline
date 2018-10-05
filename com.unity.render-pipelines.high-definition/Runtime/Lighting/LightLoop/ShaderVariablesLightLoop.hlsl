@@ -34,6 +34,7 @@
     uint _NumTileClusteredY;
     
     real4 _ShadowAtlasSize;
+    real4 _CascadeShadowAtlasSize;
 
     float4x4 _Env2DCaptureVP[MAX_ENV2D_LIGHT];
 
